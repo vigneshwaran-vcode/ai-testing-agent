@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Select AI Model — AI Investigator{% endblock %}
+{% block page_title %}Select & Configure AI Model{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card-custom mb-4">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-cpu-fill text-primary"></i>
+                    Configure AI Model for Testing
+                </h6>
+                <span class="text-muted small">Single-model focus</span>
+            </div>
+            <div class="card-body-custom">
+                <!-- Provider Tabs -->
+                <ul class="nav nav-tabs mb-4" id="providerTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="gemini-tab" data-bs-toggle="tab" data-bs-target="#tab-gemini" type="button">
+                            <i class="bi bi-google me-1 text-primary"></i>Google Gemini
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="openai-tab" data-bs-toggle="tab" data-bs-target="#tab-openai" type="button">
+                            <i class="bi bi-chat-square-quote-fill me-1 text-success"></i>OpenAI
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="anthropic-tab" data-bs-toggle="tab" data-bs-target="#tab-anthropic" type="button">
+                            <i class="bi bi-robot me-1 text-warning"></i>Anthropic Claude
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="ollama-tab" data-bs-toggle="tab" data-bs-target="#tab-ollama" type="button">
+                            <i class="bi bi-laptop me-1 text-info"></i>Ollama (Local)
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="custom-tab" data-bs-toggle="tab" data-bs-target="#tab-custom" type="button">
+                            <i class="bi bi-hdd-network me-1 text-secondary"></i>Custom Endpoint
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="providerTabContent">
+                    <!-- Google Gemini Tab -->
+                    <div class="tab-pane fade show active" id="tab-gemini" role="tabpanel">
+                        <form id="form-gemini">
+                            <!-- Preset Dropdown -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label fw-semibold small mb-0">Select Gemini Model</label>
+                                    <button type="button" class="btn btn-link p-0 text-decoration-none small" onclick="fetchLiveGeminiModels()" style="font-size: 11.5px;">
+                                        <i class="bi bi-cloud-arrow-down me-1"></i>Fetch Live Models from API
+                                    </button>
+                                </div>
+                                <select class="form-select" id="gemini-model-select" onchange="syncGeminiModelSelect(this.value)">
+                                    <option value="gemini-3.8-flash" selected>gemini-3.8-flash (Recommended: Latest Omni-model: Chat, Code, Reasoning, Vision, Audio)</option>
+                                    <option value="gemini-2.5-flash">gemini-2.5-flash (Fast & Stable Multi-modal)</option>
+                                    <option value="gemini-2.5-pro">gemini-2.5-pro (Complex Reasoning, Document Analysis, Vision)</option>
+                                    <option value="gemini-1.5-flash">gemini-1.5-flash (Legacy Flash)</option>
+                                    <option value="gemini-1.5-pro">gemini-1.5-pro (Legacy Pro)</option>
+                                </select>
+                            </div>
+
+                            <!-- Explicit Model ID input (allows custom or exact text) -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Active Model ID String</label>
+                                <input type="text" class="form-control font-monospace" id="gemini-model-input" value="gemini-3.8-flash" placeholder="e.g. gemini-3.8-flash">
+                                <div class="form-text">You can choose from the dropdown above or enter any valid Gemini model ID here.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Gemini API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="gemini-api-key" placeholder="AIzaSy... (leave blank to use saved key from Settings)">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('gemini-api-key')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">Your API key is sent only to the official Google Gemini endpoint and kept secure on the backend.</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection('gemini')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveAndActivate('gemini')">
+                                    <i class="bi bi-check-lg me-1"></i>Activate Model
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- OpenAI Tab -->
+                    <div class="tab-pane fade" id="tab-openai" role="tabpanel">
+                        <form id="form-openai">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">OpenAI Model ID</label>
+                                <select class="form-select" id="openai-model-select" onchange="document.getElementById('openai-model-input').value = this.value">
+                                    <option value="gpt-4o" selected>gpt-4o (Omni-model: Chat, Code, Vision, Reasoning)</option>
+                                    <option value="gpt-4o-mini">gpt-4o-mini (Lightweight, High Speed)</option>
+                                    <option value="gpt-4-turbo">gpt-4-turbo (Advanced Reasoning & Coding)</option>
+                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo (Legacy Chat)</option>
+                                    <option value="dall-e-3">dall-e-3 (Text-to-Image Generation)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Active Model ID String</label>
+                                <input type="text" class="form-control font-monospace" id="openai-model-input" value="gpt-4o">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">OpenAI API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="openai-api-key" placeholder="sk-proj-... (leave blank if stored in Settings)">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('openai-api-key')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection('openai')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveAndActivate('openai')">
+                                    <i class="bi bi-check-lg me-1"></i>Activate Model
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Anthropic Tab -->
+                    <div class="tab-pane fade" id="tab-anthropic" role="tabpanel">
+                        <form id="form-anthropic">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Anthropic Claude Model ID</label>
+                                <select class="form-select" id="anthropic-model-select" onchange="document.getElementById('anthropic-model-input').value = this.value">
+                                    <option value="claude-3-5-sonnet-20241022" selected>claude-3-5-sonnet-20241022 (State of the art coding & reasoning)</option>
+                                    <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022 (Ultra fast instruction following)</option>
+                                    <option value="claude-3-opus-20240229">claude-3-opus-20240229 (Complex synthesis)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Active Model ID String</label>
+                                <input type="text" class="form-control font-monospace" id="anthropic-model-input" value="claude-3-5-sonnet-20241022">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Anthropic API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="anthropic-api-key" placeholder="sk-ant-... (leave blank if stored in Settings)">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('anthropic-api-key')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection('anthropic')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveAndActivate('anthropic')">
+                                    <i class="bi bi-check-lg me-1"></i>Activate Model
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Ollama Tab -->
+                    <div class="tab-pane fade" id="tab-ollama" role="tabpanel">
+                        <form id="form-ollama">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Ollama Server Base URL</label>
+                                <input type="text" class="form-control" id="ollama-url" value="http://localhost:11434">
+                                <div class="form-text">Ensure Ollama is running locally on port 11434.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Model ID (Local Tag)</label>
+                                <input type="text" class="form-control" id="ollama-model-id" value="llama3" placeholder="e.g. llama3, mistral, qwen2.5-coder, llava">
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection('ollama')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveAndActivate('ollama')">
+                                    <i class="bi bi-check-lg me-1"></i>Activate Model
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Custom API Tab -->
+                    <div class="tab-pane fade" id="tab-custom" role="tabpanel">
+                        <form id="form-custom">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Custom API Base URL (OpenAI-Compatible)</label>
+                                <input type="text" class="form-control" id="custom-url" placeholder="https://api.together.xyz/v1 or http://localhost:8000/v1">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">Model ID</label>
+                                <input type="text" class="form-control" id="custom-model-id" placeholder="e.g. meta-llama/Llama-3-70b-chat-hf">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">API Key (Optional)</label>
+                                <input type="password" class="form-control" id="custom-api-key" placeholder="Bearer token if required">
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="testConnection('custom')">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Test Connection
+                                </button>
+                                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveAndActivate('custom')">
+                                    <i class="bi bi-check-lg me-1"></i>Activate Model
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Connection Status Alert Area -->
+                <div id="connectionAlert" class="mt-4" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Model Card & Guidelines -->
+    <div class="col-lg-4">
+        <!-- Current Active Target -->
+        <div class="card-custom mb-4">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-shield-check text-primary"></i>
+                    Current Active Target
+                </h6>
+            </div>
+            <div class="card-body-custom">
+                {% if active_model %}
+                    <div class="text-center p-3 mb-3 rounded" style="background: #f8fafc; border: 1px dashed #cbd5e1;">
+                        <i class="bi bi-cpu fs-1 text-primary mb-2 d-block"></i>
+                        <h6 class="fw-bold mb-1">{{ active_model.display_name or active_model.model_id }}</h6>
+                        <span class="badge bg-primary text-uppercase">{{ active_model.provider }}</span>
+                        <div class="text-muted small mt-2">Model ID: <code>{{ active_model.model_id }}</code></div>
+                    </div>
+                    <p class="small text-muted mb-3">
+                        This model is designated as the primary subject for testing. When you trigger tests, all prompts will run exclusively against this integration.
+                    </p>
+                    <a href="{{ url_for('capabilities') }}" class="btn btn-outline-primary btn-sm w-100 mb-2">
+                        <i class="bi bi-lightning-charge me-1"></i>Review Detected Capabilities
+                    </a>
+                    <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom btn-sm w-100">
+                        <i class="bi bi-sliders me-1"></i>Configure Test Cases
+                    </a>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-exclamation-circle fs-2 text-warning mb-2 d-block"></i>
+                        <p class="small mb-0">No active model selected.<br>Pick a provider on the left and click <strong>Activate Model</strong>.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Switch from Saved Models -->
+        {% if saved_models %}
+        <div class="card-custom mb-4">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-bookmark-check-fill text-primary"></i>
+                    Configured Models
+                </h6>
+            </div>
+            <div class="card-body-custom p-0">
+                <div class="list-group list-group-flush small" style="max-height: 220px; overflow-y: auto;">
+                    {% for sm in saved_models %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                        <div>
+                            <div class="fw-bold text-dark">{{ sm.display_name or sm.model_id }}</div>
+                            <span class="badge bg-light text-muted border text-uppercase" style="font-size: 9px;">{{ sm.provider }}</span>
+                        </div>
+                        <div>
+                            {% if active_model and active_model.id == sm.id %}
+                                <span class="badge bg-success" style="font-size: 10px;">ACTIVE</span>
+                            {% else %}
+                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 11px;" onclick="activateExistingModel({{ sm.id }})">
+                                    Switch
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card-custom">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-info-circle text-primary"></i>
+                    Testing Philosophy
+                </h6>
+            </div>
+            <div class="card-body-custom small text-muted">
+                <p><strong>Single-Model Investigation:</strong> Unlike leaderboards or side-by-side arenas, this tool analyzes <em>one AI model at a time</em>.</p>
+                <p class="mb-0">It diagnoses prompt adherence, hallucinations, occupational and demographic bias, code execution reliability, and safety boundary adherence.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePasswordVisibility(id) {
+        const inp = document.getElementById(id);
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    function syncGeminiModelSelect(val) {
+        document.getElementById('gemini-model-input').value = val;
+    }
+
+    function showStatusAlert(type, message) {
+        const alertBox = document.getElementById('connectionAlert');
+        alertBox.className = `alert alert-${type} d-flex align-items-center`;
+        alertBox.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-2"></i><div>${message}</div>`;
+        alertBox.style.display = 'block';
+    }
+
+    function fetchLiveGeminiModels() {
+        const apiKey = document.getElementById('gemini-api-key').value;
+        showStatusAlert('info', 'Connecting to Google Gemini API to fetch available models...');
+
+        fetch('/api/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: 'gemini', model_id: 'gemini-3.8-flash', api_key: apiKey })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.models && data.models.length > 0) {
+                const select = document.getElementById('gemini-model-select');
+                select.innerHTML = '';
+
+                // Ensure gemini-3.8-flash is at the top if present
+                const sortedModels = data.models.filter(m => !m.includes('embedding') && !m.includes('aqa'));
+                if (sortedModels.includes('gemini-3.8-flash')) {
+                    const opt = document.createElement('option');
+                    opt.value = 'gemini-3.8-flash';
+                    opt.innerText = 'gemini-3.8-flash (Recommended: Latest Flash Omni)';
+                    opt.selected = true;
+                    select.appendChild(opt);
+                }
+
+                sortedModels.forEach(m => {
+                    if (m !== 'gemini-3.8-flash') {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.innerText = m;
+                        select.appendChild(opt);
+                    }
+                });
+
+                document.getElementById('gemini-model-input').value = select.value;
+                showStatusAlert('success', `Found ${data.models.length} accessible models! Set to: ${select.value}`);
+            } else {
+                showStatusAlert('warning', data.message || 'Could not fetch models.');
+            }
+        })
+        .catch(err => {
+            showStatusAlert('danger', 'Error fetching models: ' + err);
+        });
+    }
+
+    function testConnection(provider) {
+        let model_id = '', api_key = '', base_url = '';
+
+        if (provider === 'gemini') {
+            model_id = document.getElementById('gemini-model-input').value.trim() || document.getElementById('gemini-model-select').value;
+            api_key = document.getElementById('gemini-api-key').value;
+        } else if (provider === 'openai') {
+            model_id = document.getElementById('openai-model-input').value.trim() || document.getElementById('openai-model-select').value;
+            api_key = document.getElementById('openai-api-key').value;
+        } else if (provider === 'anthropic') {
+            model_id = document.getElementById('anthropic-model-input').value.trim() || document.getElementById('anthropic-model-select').value;
+            api_key = document.getElementById('anthropic-api-key').value;
+        } else if (provider === 'ollama') {
+            model_id = document.getElementById('ollama-model-id').value;
+            base_url = document.getElementById('ollama-url').value;
+        } else if (provider === 'custom') {
+            model_id = document.getElementById('custom-model-id').value;
+            base_url = document.getElementById('custom-url').value;
+            api_key = document.getElementById('custom-api-key').value;
+        }
+
+        showStatusAlert('info', `Testing connection to ${provider.toUpperCase()} (${model_id})...`);
+
+        fetch('/api/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider, model_id, api_key, base_url })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showStatusAlert('success', data.message || `Successfully verified connection to ${model_id}!`);
+            } else {
+                showStatusAlert('danger', data.message || `Connection failed to ${model_id}.`);
+            }
+        })
+        .catch(err => {
+            showStatusAlert('danger', 'Network error while testing connection: ' + err);
+        });
+    }
+
+    function saveAndActivate(provider) {
+        let model_id = '', api_key = '', base_url = '';
+
+        if (provider === 'gemini') {
+            model_id = document.getElementById('gemini-model-input').value.trim() || document.getElementById('gemini-model-select').value;
+            api_key = document.getElementById('gemini-api-key').value;
+        } else if (provider === 'openai') {
+            model_id = document.getElementById('openai-model-input').value.trim() || document.getElementById('openai-model-select').value;
+            api_key = document.getElementById('openai-api-key').value;
+        } else if (provider === 'anthropic') {
+            model_id = document.getElementById('anthropic-model-input').value.trim() || document.getElementById('anthropic-model-select').value;
+            api_key = document.getElementById('anthropic-api-key').value;
+        } else if (provider === 'ollama') {
+            model_id = document.getElementById('ollama-model-id').value;
+            base_url = document.getElementById('ollama-url').value;
+        } else if (provider === 'custom') {
+            model_id = document.getElementById('custom-model-id').value;
+            base_url = document.getElementById('custom-url').value;
+            api_key = document.getElementById('custom-api-key').value;
+        }
+
+        const displayName = `${provider.toUpperCase()} ${model_id}`;
+
+        fetch('/api/select-model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider, model_id, display_name: displayName, api_key, base_url })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showStatusAlert('success', `${data.message}. Redirecting to Capabilities...`);
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('capabilities') }}";
+                }, 800);
+            } else {
+                showStatusAlert('danger', data.message);
+            }
+        })
+        .catch(err => {
+            showStatusAlert('danger', 'Failed to activate model: ' + err);
+        });
+    }
+
+    function activateExistingModel(configId) {
+        fetch('/api/models/' + configId + '/activate', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Failed to switch model.');
+                }
+            })
+            .catch(() => window.location.reload());
+    }
+
+    // Initialize defaults on DOM load
+    document.addEventListener('DOMContentLoaded', () => {
+        const geminiSelect = document.getElementById('gemini-model-select');
+        const geminiInput = document.getElementById('gemini-model-input');
+        if (geminiSelect && geminiInput) {
+            geminiInput.value = geminiSelect.value || 'gemini-3.8-flash';
+        }
+    });
+</script>
+{% endblock %}
