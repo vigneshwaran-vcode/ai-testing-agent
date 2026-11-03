@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Investigation Results — AI Investigator{% endblock %}
+{% block page_title %}AI Failure Diagnostics & Investigation{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+        <h6 class="text-secondary small mb-1">Session Under Investigation:</h6>
+        <div class="dropdown">
+            <button class="btn btn-outline-dark btn-sm dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
+                {% if session %}
+                    {{ session.session_name }} ({{ session.provider|upper }}: {{ session.model_id }})
+                {% else %}
+                    No Session Selected
+                {% endif %}
+            </button>
+            <ul class="dropdown-menu">
+                {% for s in sessions %}
+                <li>
+                    <a class="dropdown-item small" href="{{ url_for('investigation', session_id=s.id) }}">
+                        {{ s.session_name }} — <strong>{{ s.overall_score }}/100</strong> ({{ s.reliability_level }})
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- Category Filter Buttons -->
+    <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary active" onclick="filterCategory('all')">All Results</button>
+        <button type="button" class="btn btn-outline-danger" onclick="filterCategory('Incorrect')">Incorrect / Hallucination</button>
+        <button type="button" class="btn btn-outline-warning" onclick="filterCategory('Partially correct')">Partially Correct</button>
+        <button type="button" class="btn btn-outline-success" onclick="filterCategory('Correct')">Correct</button>
+        <button type="button" class="btn btn-outline-info" onclick="filterCategory('Failed execution')">Failed Execution</button>
+    </div>
+</div>
+
+{% if not session or not results %}
+<div class="card-custom text-center py-5">
+    <div class="card-body-custom">
+        <i class="bi bi-search fs-1 text-muted mb-2 d-block"></i>
+        <p class="text-muted mb-2">No test investigation data found for this session.</p>
+        <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom btn-sm">Configure & Run Test Suite</a>
+    </div>
+</div>
+{% else %}
+
+<!-- Results Cards -->
+<div class="row g-3">
+    {% for r in results %}
+    <div class="col-12 result-item" data-category="{{ r.status }}">
+        <div class="card-custom investigation-card severity-{{ r.severity or 'low' }}">
+            <div class="card-header-custom py-2 px-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-secondary text-uppercase" style="font-size: 10px;">{{ r.capability }}</span>
+                    <strong class="small text-dark">{{ r.subcategory or 'Standard Probe' }}</strong>
+                    <span class="badge bg-light text-muted border" style="font-size: 10px;">{{ r.difficulty }}</span>
+
+                    <!-- Category Badge -->
+                    <span class="badge {% if r.status == 'Correct' %}bg-success{% elif r.status == 'Partially correct' %}bg-warning text-dark{% elif r.status == 'Failed execution' %}bg-danger{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}" style="font-size: 11px;">
+                        {{ r.status }}
+                    </span>
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <span class="text-muted small"><i class="bi bi-stopwatch me-1"></i>{{ r.response_time_ms }} ms</span>
+                    <span class="badge bg-light text-dark border">Confidence: {{ r.confidence or 90 }}%</span>
+                    <strong class="{% if r.score >= 80 %}text-success{% elif r.score >= 50 %}text-warning{% else %}text-danger{% endif %} fs-6">
+                        {{ r.score }}/100
+                    </strong>
+                </div>
+            </div>
+
+            <div class="card-body-custom p-3">
+                <div class="row g-3">
+                    <!-- Left Column: Prompt & Output -->
+                    <div class="col-lg-6">
+                        <div class="mb-2">
+                            <span class="text-muted small fw-semibold text-uppercase">1. Test Prompt</span>
+                            <div class="p-2 rounded bg-light border small font-monospace mt-1 text-dark" style="white-space: pre-wrap; max-height: 120px; overflow-y: auto;">{{ r.prompt }}</div>
+                        </div>
+
+                        <div>
+                            <span class="text-muted small fw-semibold text-uppercase">2. Model Generated Output</span>
+                            <div class="p-2 rounded bg-white border small mt-1 text-dark" style="white-space: pre-wrap; max-height: 160px; overflow-y: auto;">{{ r.model_response }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Forensic Diagnosis & Evidence -->
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded bg-light border h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-bold small text-dark"><i class="bi bi-shield-exclamation text-primary me-1"></i>Detected Failure / Limitation:</span>
+                                <span class="badge {% if r.severity == 'critical' %}bg-danger{% elif r.severity == 'high' %}bg-warning text-dark{% elif r.severity == 'medium' %}bg-info text-dark{% else %}bg-success{% endif %} text-uppercase" style="font-size: 10px;">
+                                    Severity: {{ r.severity or 'LOW' }}
+                                </span>
+                            </div>
+                            <div class="small text-danger fw-semibold mb-2">
+                                {{ r.failures or 'No critical failure observed; meets domain standards.' }}
+                            </div>
+
+                            <div class="mb-2">
+                                <span class="text-muted small fw-semibold">Supporting Evidence:</span>
+                                <p class="small text-secondary mb-1" style="font-size: 12px;">{{ r.evidence or 'Output verified against factual/algorithmic baseline.' }}</p>
+                            </div>
+
+                            <div class="border-top pt-2 mt-2">
+                                <span class="text-dark small fw-semibold"><i class="bi bi-lightbulb-fill text-warning me-1"></i>Recommended Improvement:</span>
+                                <p class="small text-muted mb-0" style="font-size: 12px;">{{ r.recommendation or 'Maintain standard system instructions.' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterCategory(cat) {
+        document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        const items = document.querySelectorAll('.result-item');
+        items.forEach(it => {
+            if (cat === 'all' || it.getAttribute('data-category') === cat) {
+                it.style.display = 'block';
+            } else {
+                it.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}
