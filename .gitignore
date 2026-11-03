@@ -1,0 +1,40 @@
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# SQLite Database (Stores user keys & local sessions)
+*.db
+*.sqlite
+*.sqlite3
+ai_testing.db
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary / Sandbox execution outputs
+sandbox/
+uploads/
+*.log
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
