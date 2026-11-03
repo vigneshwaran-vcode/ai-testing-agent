@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Model Capabilities — AI Investigator{% endblock %}
+{% block page_title %}AI Capability Detection{% endblock %}
+
+{% block content %}
+{% if not active_model %}
+<div class="alert alert-warning d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+    <div>
+        <strong>No model selected.</strong> Please <a href="{{ url_for('select_model') }}" class="alert-link">select an AI model</a> first to detect and review its capabilities.
+    </div>
+</div>
+{% else %}
+
+<div class="card-custom mb-4" style="background: linear-gradient(135deg, #f8fafc, #eff6ff);">
+    <div class="card-body-custom p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary text-uppercase">{{ active_model.provider }}</span>
+                <h5 class="fw-bold mb-0 text-dark">{{ active_model.display_name or active_model.model_id }}</h5>
+            </div>
+            <p class="text-secondary small mb-0">
+                Capabilities detected via provider metadata, API schemas, and feature flags. Only active domains will be evaluated.
+            </p>
+        </div>
+        <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom">
+            <i class="bi bi-sliders me-1"></i>Proceed to Test Configuration &rarr;
+        </a>
+    </div>
+</div>
+
+<!-- Capabilities Grid -->
+<div class="row g-4 mb-4">
+    {% for def_key, def_val in all_definitions.items() %}
+        {% set is_active = False %}
+        {% for c in capabilities %}
+            {% if c.id == def_key %}
+                {% set is_active = True %}
+            {% endif %}
+        {% endfor %}
+
+        <div class="col-lg-6 col-xl-4">
+            <div class="card-custom h-100 {% if not is_active %}opacity-50 border-dashed{% endif %}">
+                <div class="card-header-custom">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi {{ def_val.icon }} text-{{ def_val.color }} fs-5"></i>
+                        <h6 class="card-title-custom">{{ def_val.name }}</h6>
+                    </div>
+                    {% if is_active %}
+                        <span class="badge bg-success-subtle text-success border border-success-subtle small">SUPPORTED</span>
+                    {% else %}
+                        <span class="badge bg-secondary-subtle text-secondary small">UNSUPPORTED</span>
+                    {% endif %}
+                </div>
+                <div class="card-body-custom">
+                    <p class="small text-muted mb-3">{{ def_val.description }}</p>
+                    <div class="small fw-semibold text-secondary mb-2">Evaluated Subcategories:</div>
+                    <ul class="list-unstyled small mb-0">
+                        {% for sub in def_val.subcategories %}
+                            <li class="mb-1 text-truncate">
+                                <i class="bi bi-check2 text-{{ def_val.color }} me-1"></i>{{ sub }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="d-flex justify-content-end mb-4">
+    <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom px-4">
+        <i class="bi bi-check2-circle me-1"></i>Configure Test Cases for Active Capabilities
+    </a>
+</div>
+
+{% endif %}
+{% endblock %}
