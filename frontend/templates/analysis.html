@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Analysis — AI Investigator{% endblock %}
+{% block page_title %}Capability Performance & Reliability Analysis{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+        <h6 class="text-secondary small mb-1">Session Analyzed:</h6>
+        <div class="dropdown">
+            <button class="btn btn-outline-dark btn-sm dropdown-toggle fw-bold" type="button" data-bs-toggle="dropdown">
+                {% if session %}
+                    {{ session.session_name }} ({{ session.provider|upper }}: {{ session.model_id }})
+                {% else %}
+                    No Session Selected
+                {% endif %}
+            </button>
+            <ul class="dropdown-menu">
+                {% for s in sessions %}
+                <li>
+                    <a class="dropdown-item small" href="{{ url_for('analysis', session_id=s.id) }}">
+                        {{ s.session_name }} — <strong>{{ s.overall_score }}/100</strong>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('reports', session_id=session.id if session else '') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-file-earmark-arrow-down me-1"></i>Download PDF / CSV
+        </a>
+    </div>
+</div>
+
+{% if not session or not cap_scores %}
+<div class="card-custom text-center py-5">
+    <div class="card-body-custom">
+        <i class="bi bi-pie-chart fs-1 text-muted mb-2 d-block"></i>
+        <p class="text-muted mb-2">No capability score data recorded for this session.</p>
+        <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom btn-sm">Launch a Test Suite</a>
+    </div>
+</div>
+{% else %}
+
+<!-- Reliability Assessment Banner -->
+<div class="card-custom mb-4 border-0" style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #fff;">
+    <div class="card-body-custom p-4">
+        <div class="row align-items-center g-3">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary text-uppercase">{{ session.provider }}</span>
+                    <h5 class="fw-bold mb-0">{{ session.model_id }} Reliability Assessment</h5>
+                </div>
+                <p class="text-white-50 small mb-2">
+                    Overall capability score calculated from {{ session.total_tests }} executed tests across tested domains. Scores reflect ground-truth evaluations, factual accuracy verification, instruction constraints, and code sandbox execution.
+                </p>
+                <div class="small text-white-50">
+                    Thresholds: <span class="text-success fw-bold">HIGH (80–100)</span> &bull; <span class="text-warning fw-bold">MEDIUM (50–79)</span> &bull; <span class="text-danger fw-bold">LOW (&lt;50)</span>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end text-center">
+                <div class="display-5 fw-bold {% if session.overall_score >= 80 %}text-success{% elif session.overall_score >= 50 %}text-warning{% else %}text-danger{% endif %} mb-1">
+                    {{ session.overall_score }}<small class="fs-6 text-white-50">/100</small>
+                </div>
+                <div>
+                    {% if session.reliability_level == 'HIGH' %}
+                        <span class="badge bg-success fs-6 px-3 py-1">HIGH RELIABILITY</span>
+                    {% elif session.reliability_level == 'MEDIUM' %}
+                        <span class="badge bg-warning text-dark fs-6 px-3 py-1">MEDIUM RELIABILITY</span>
+                    {% else %}
+                        <span class="badge bg-danger fs-6 px-3 py-1">LOW RELIABILITY</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+    <!-- Radar Chart -->
+    <div class="col-lg-6">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-radar text-primary"></i>
+                    Capability Profile Radar
+                </h6>
+                <span class="text-muted small">Multi-Domain Fingerprint</span>
+            </div>
+            <div class="card-body-custom">
+                <div style="height: 320px;">
+                    <canvas id="capabilityRadarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Latency & Failure Bar Chart -->
+    <div class="col-lg-6">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-speedometer2 text-primary"></i>
+                    Response Latency & Failures by Domain
+                </h6>
+            </div>
+            <div class="card-body-custom">
+                <div style="height: 320px;">
+                    <canvas id="latencyBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Capability Scores Table -->
+<div class="card-custom mb-4">
+    <div class="card-header-custom">
+        <h6 class="card-title-custom">
+            <i class="bi bi-table text-primary"></i>
+            Domain Breakdown & Limitations
+        </h6>
+    </div>
+    <div class="card-body-custom p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Capability Domain</th>
+                        <th>Tests Executed</th>
+                        <th>Passed</th>
+                        <th>Detected Errors</th>
+                        <th>Average Latency</th>
+                        <th>Domain Score</th>
+                        <th>Reliability Level</th>
+                        <th class="pe-4">Assessment Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cs in cap_scores %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-capitalize">
+                            <i class="bi bi-check-circle-fill text-primary me-2"></i>{{ cs.capability }}
+                        </td>
+                        <td>{{ cs.total_tests }}</td>
+                        <td><span class="text-success fw-bold">{{ cs.passed_tests }}</span></td>
+                        <td><span class="text-danger fw-bold">{{ cs.failure_count }}</span></td>
+                        <td>{{ cs.avg_response_time }} ms</td>
+                        <td>
+                            <strong class="{% if cs.avg_score >= 80 %}text-success{% elif cs.avg_score >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ cs.avg_score }}%
+                            </strong>
+                        </td>
+                        <td>
+                            {% if cs.reliability_level == 'HIGH' %}
+                                <span class="badge-rel-high">HIGH</span>
+                            {% elif cs.reliability_level == 'MEDIUM' %}
+                                <span class="badge-rel-med">MEDIUM</span>
+                            {% else %}
+                                <span class="badge-rel-low">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-4 small text-muted">
+                            {% if cs.avg_score >= 80 %}
+                                Strong competence; adheres strictly to constraints.
+                            {% elif cs.avg_score >= 50 %}
+                                Moderate; occasional formatting deviations or edge-case failures.
+                            {% else %}
+                                Critical limitations detected; requires human supervision or prompt tuning.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if session and cap_scores %}
+<script>
+    const capData = {{ cap_scores|tojson }};
+    const labels = capData.map(c => c.capability.toUpperCase());
+    const scores = capData.map(c => c.avg_score);
+    const latencies = capData.map(c => c.avg_response_time);
+
+    // Radar Chart
+    const radarCtx = document.getElementById('capabilityRadarChart').getContext('2d');
+    new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Domain Score (0-100)',
+                data: scores,
+                backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                borderColor: '#4f46e5',
+                pointBackgroundColor: '#4f46e5',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                r: {
+                    angleLines: { color: '#e2e8f0' },
+                    grid: { color: '#e2e8f0' },
+                    suggestedMin: 0,
+                    suggestedMax: 100,
+                    ticks: { stepSize: 20 }
+                }
+            }
+        }
+    });
+
+    // Latency Chart
+    const barCtx = document.getElementById('latencyBarChart').getContext('2d');
+    new Chart(barCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Average Latency (ms)',
+                data: latencies,
+                backgroundColor: 'rgba(37, 99, 235, 0.75)',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Milliseconds (ms)' }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}
