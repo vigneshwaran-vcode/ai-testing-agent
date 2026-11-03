@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — AI Model Testing & Investigation{% endblock %}
+{% block page_title %}Model Evaluation Dashboard{% endblock %}
+
+{% block content %}
+{% if not active_model %}
+<!-- Callout to select model -->
+<div class="card-custom mb-4 border-primary border-opacity-25" style="background: linear-gradient(135deg, #f0f7ff, #faf5ff);">
+    <div class="card-body-custom p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+            <h5 class="fw-bold text-primary mb-1"><i class="bi bi-info-circle-fill me-2"></i>No AI Model Selected Yet</h5>
+            <p class="text-secondary mb-0 small">Connect an AI model via API (OpenAI, Google Gemini, Claude, Ollama, or Custom API) to begin automated capability testing, bias detection, and failure investigation.</p>
+        </div>
+        <a href="{{ url_for('select_model') }}" class="btn btn-primary-custom">
+            <i class="bi bi-cpu me-1"></i>Select AI Model Now
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Primary Metric Tiles -->
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="bi bi-cpu"></i>
+            </div>
+            <div>
+                <div class="stat-value">
+                    {% if active_model %}
+                        <span class="text-truncate d-inline-block" style="max-width: 140px;" title="{{ active_model.model_id }}">{{ active_model.model_id }}</span>
+                    {% else %}
+                        <span class="text-muted">None</span>
+                    {% endif %}
+                </div>
+                <div class="stat-label">Active Model: {% if active_model %}{{ active_model.provider|upper }}{% else %}Unset{% endif %}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="bi bi-award-fill"></i>
+            </div>
+            <div>
+                <div class="stat-value">
+                    {% if latest_session and latest_session.overall_score is not none %}
+                        {{ latest_session.overall_score }}<small class="text-muted" style="font-size: 14px;">/100</small>
+                    {% else %}
+                        --
+                    {% endif %}
+                </div>
+                <div class="stat-label">
+                    Reliability:
+                    {% if latest_session %}
+                        {% if latest_session.reliability_level == 'HIGH' %}
+                            <span class="badge-rel-high">HIGH</span>
+                        {% elif latest_session.reliability_level == 'MEDIUM' %}
+                            <span class="badge-rel-med">MEDIUM</span>
+                        {% else %}
+                            <span class="badge-rel-low">LOW</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">Not Tested</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon info">
+                <i class="bi bi-check2-circle"></i>
+            </div>
+            <div>
+                <div class="stat-value">
+                    {% if latest_session %}
+                        {{ latest_session.passed_tests }} / {{ latest_session.total_tests }}
+                    {% else %}
+                        0 / 0
+                    {% endif %}
+                </div>
+                <div class="stat-label">Passed Tests (Latest Run)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="bi bi-stopwatch-fill"></i>
+            </div>
+            <div>
+                <div class="stat-value">
+                    {% if latest_session and latest_session.avg_response_time %}
+                        {{ latest_session.avg_response_time }}<small class="text-muted" style="font-size: 14px;"> ms</small>
+                    {% else %}
+                        --
+                    {% endif %}
+                </div>
+                <div class="stat-label">Average Response Latency</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Center Charts and Model Info -->
+<div class="row g-4 mb-4">
+    <!-- Capabilities Performance Chart -->
+    <div class="col-lg-8">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-bar-chart-line-fill text-primary"></i>
+                    Selected Model Capability Score Distribution
+                </h6>
+                <span class="text-muted small">0-100 Scale per Task Domain</span>
+            </div>
+            <div class="card-body-custom">
+                {% if latest_session %}
+                    <div style="height: 290px;">
+                        <canvas id="capabilityBarChart"></canvas>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-bar-chart fs-1 text-secondary opacity-50 mb-2 d-block"></i>
+                        <p class="mb-2">No test run recorded yet for this model.</p>
+                        <a href="{{ url_for('test_config') }}" class="btn btn-sm btn-outline-primary">Run First Test Suite</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Model Details & Testing Guidelines -->
+    <div class="col-lg-4">
+        <div class="card-custom h-100">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-info-square-fill text-primary"></i>
+                    Model Profile & Status
+                </h6>
+            </div>
+            <div class="card-body-custom">
+                {% if active_model %}
+                    <ul class="list-group list-group-flush small mb-3">
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Target Model:</span>
+                            <strong class="text-end">{{ active_model.model_id }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Provider:</span>
+                            <span class="badge bg-primary text-uppercase">{{ active_model.provider }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between px-0">
+                            <span class="text-muted">Status:</span>
+                            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Ready for testing</span>
+                        </li>
+                    </ul>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('capabilities') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye me-1"></i>View Supported Capabilities
+                        </a>
+                        <a href="{{ url_for('test_config') }}" class="btn btn-primary-custom btn-sm">
+                            <i class="bi bi-play-circle me-1"></i>Configure & Execute Tests
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="small mb-3">No AI model currently configured.</p>
+                        <a href="{{ url_for('select_model') }}" class="btn btn-primary-custom btn-sm">Select Model</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sessions Table -->
+<div class="card-custom">
+    <div class="card-header-custom">
+        <h6 class="card-title-custom">
+            <i class="bi bi-clock-history text-primary"></i>
+            Recent Test Sessions for this Model
+        </h6>
+        <a href="{{ url_for('history') }}" class="small text-primary text-decoration-none">View All History &rarr;</a>
+    </div>
+    <div class="card-body-custom p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Session Name</th>
+                        <th>Model Tested</th>
+                        <th>Total Tests</th>
+                        <th>Overall Score</th>
+                        <th>Reliability</th>
+                        <th>Latency</th>
+                        <th>Date Tested</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td class="ps-4 fw-bold">
+                            <a href="{{ url_for('investigation', session_id=s.id) }}" class="text-dark text-decoration-none">
+                                {{ s.session_name }}
+                            </a>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">{{ s.provider|upper }}: {{ s.model_id }}</span></td>
+                        <td>{{ s.passed_tests }} / {{ s.total_tests }}</td>
+                        <td>
+                            <strong class="{% if s.overall_score >= 80 %}text-success{% elif s.overall_score >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ s.overall_score }}/100
+                            </strong>
+                        </td>
+                        <td>
+                            {% if s.reliability_level == 'HIGH' %}
+                                <span class="badge-rel-high">HIGH</span>
+                            {% elif s.reliability_level == 'MEDIUM' %}
+                                <span class="badge-rel-med">MEDIUM</span>
+                            {% else %}
+                                <span class="badge-rel-low">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ s.avg_response_time }} ms</td>
+                        <td class="text-muted">{{ s.started_at }}</td>
+                        <td class="text-end pe-4">
+                            <a href="{{ url_for('investigation', session_id=s.id) }}" class="btn btn-sm btn-outline-primary py-0 px-2" title="Inspect Failures">
+                                <i class="bi bi-search"></i>
+                            </a>
+                            <a href="{{ url_for('reports', session_id=s.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Export Report">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            No test sessions executed yet. Configure an AI model to begin your first test run.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if latest_session %}
+<script>
+    fetch('/api/session/{{ latest_session.id }}')
+        .then(res => res.json())
+        .then(data => {
+            if (data.capability_scores && data.capability_scores.length > 0) {
+                const labels = data.capability_scores.map(c => c.capability.toUpperCase());
+                const scores = data.capability_scores.map(c => c.avg_score);
+                const bgColors = scores.map(s => s >= 80 ? 'rgba(16, 185, 129, 0.75)' : (s >= 50 ? 'rgba(245, 158, 11, 0.75)' : 'rgba(239, 68, 68, 0.75)'));
+
+                const ctx = document.getElementById('capabilityBarChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Capability Score (0-100)',
+                            data: scores,
+                            backgroundColor: bgColors,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { stepSize: 20 }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+        });
+</script>
+{% endif %}
+{% endblock %}
