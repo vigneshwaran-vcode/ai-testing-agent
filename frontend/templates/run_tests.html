@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Run Tests — AI Investigator{% endblock %}
+{% block page_title %}Test Execution Engine{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Execution Console & Status -->
+    <div class="col-lg-4">
+        <div class="card-custom mb-4">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-play-circle-fill text-primary"></i>
+                    Session Controller
+                </h6>
+                <span id="runnerStatusBadge" class="badge bg-primary">INITIALIZING</span>
+            </div>
+            <div class="card-body-custom">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Overall Progress</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="row g-2 text-center mb-3">
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light">
+                            <div id="statTotal" class="fw-bold fs-5">0</div>
+                            <div class="text-muted" style="font-size: 11px;">Total Tests</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light">
+                            <div id="statPassed" class="fw-bold fs-5 text-success">0</div>
+                            <div class="text-muted" style="font-size: 11px;">Passed</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light">
+                            <div id="statFailed" class="fw-bold fs-5 text-danger">0</div>
+                            <div class="text-muted" style="font-size: 11px;">Failed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3 small">
+                    <div class="d-flex justify-content-between text-muted mb-1">
+                        <span>Target Model:</span>
+                        <strong class="text-dark">{{ active_model.model_id if active_model else 'N/A' }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mb-1">
+                        <span>Current Test:</span>
+                        <span id="currentTestTicker" class="text-truncate" style="max-width: 170px;">Waiting...</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted">
+                        <span>Average Latency:</span>
+                        <span id="avgLatencyDisplay">0 ms</span>
+                    </div>
+                </div>
+
+                <!-- Execution Controls -->
+                <div class="d-grid gap-2">
+                    <button id="pauseResumeBtn" class="btn btn-outline-secondary btn-sm" onclick="togglePause()">
+                        <i class="bi bi-pause-fill me-1"></i>Pause Execution
+                    </button>
+                    <button id="stopBtn" class="btn btn-outline-danger btn-sm" onclick="stopExecution()">
+                        <i class="bi bi-stop-fill me-1"></i>Stop Execution
+                    </button>
+                    <a id="viewResultsBtn" href="#" class="btn btn-primary-custom btn-sm mt-2" style="display: none;">
+                        <i class="bi bi-search me-1"></i>View Investigation Results &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-custom">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-info-circle text-primary"></i>
+                    Real-Time Evaluation
+                </h6>
+            </div>
+            <div class="card-body-custom small text-muted">
+                <p>Every test prompt is dispatched directly to the configured AI model API in real time.</p>
+                <p>Coding tasks are executed in an isolated Python subprocess sandbox. Grounded factual claims and edge cases are checked against domain rubrics immediately.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Execution Stream Output -->
+    <div class="col-lg-8">
+        <div class="card-custom">
+            <div class="card-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="card-title-custom">
+                        <i class="bi bi-terminal text-primary"></i>
+                        Live Test Output Stream
+                    </h6>
+                    <span id="streamCounter" class="badge bg-light text-dark border">0 completed</span>
+                </div>
+                <div class="small text-muted" id="currentCapabilityTag"></div>
+            </div>
+            <div class="card-body-custom" style="max-height: 650px; overflow-y: auto;" id="liveStreamContainer">
+                <div class="text-center py-5 text-muted" id="initialWaitingState">
+                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                    <span>Initializing test suite and preparing prompts...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const sessionId = {{ session_id or 0 }};
+    let testCasesQueue = [];
+    let currentIndex = 0;
+    let isPaused = false;
+    let isStopped = false;
+    let passedCount = 0;
+    let failedCount = 0;
+    let latencyList = [];
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const stored = sessionStorage.getItem('pending_test_cases');
+        if (stored) {
+            testCasesQueue = JSON.parse(stored);
+            document.getElementById('statTotal').innerText = testCasesQueue.length;
+            if (testCasesQueue.length > 0) {
+                runNextTest();
+            }
+        } else {
+            document.getElementById('liveStreamContainer').innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <p>No active test cases found in queue.</p>
+                    <a href="{{ url_for('test_config') }}" class="btn btn-sm btn-primary-custom">Configure Test Suite</a>
+                </div>
+            `;
+        }
+    });
+
+    function togglePause() {
+        isPaused = !isPaused;
+        const btn = document.getElementById('pauseResumeBtn');
+        const badge = document.getElementById('runnerStatusBadge');
+
+        if (isPaused) {
+            btn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Resume Execution';
+            badge.className = 'badge bg-warning';
+            badge.innerText = 'PAUSED';
+        } else {
+            btn.innerHTML = '<i class="bi bi-pause-fill me-1"></i>Pause Execution';
+            badge.className = 'badge bg-success';
+            badge.innerText = 'EXECUTING';
+            runNextTest();
+        }
+    }
+
+    function stopExecution() {
+        isStopped = true;
+        document.getElementById('runnerStatusBadge').className = 'badge bg-danger';
+        document.getElementById('runnerStatusBadge').innerText = 'STOPPED';
+        finalizeSession();
+    }
+
+    function runNextTest() {
+        if (isPaused || isStopped) return;
+
+        if (currentIndex >= testCasesQueue.length) {
+            // All tests finished
+            finalizeSession();
+            return;
+        }
+
+        const tc = testCasesQueue[currentIndex];
+        document.getElementById('runnerStatusBadge').className = 'badge bg-success';
+        document.getElementById('runnerStatusBadge').innerText = `TEST ${currentIndex + 1} / ${testCasesQueue.length}`;
+        document.getElementById('currentTestTicker').innerText = `[${tc.capability.toUpperCase()}] ${tc.subcategory || 'General'}`;
+
+        const waitingState = document.getElementById('initialWaitingState');
+        if (waitingState) waitingState.remove();
+
+        // Call backend API to execute single test
+        fetch('/api/test/execute-single', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: sessionId,
+                test_case: tc
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.result) {
+                renderResultCard(data.result);
+                if (data.result.score >= 70) {
+                    passedCount++;
+                } else {
+                    failedCount++;
+                }
+                latencyList.push(data.result.response_time_ms || 0);
+
+                // Update counters
+                document.getElementById('statPassed').innerText = passedCount;
+                document.getElementById('statFailed').innerText = failedCount;
+                const avg = Math.round(latencyList.reduce((a, b) => a + b, 0) / latencyList.length);
+                document.getElementById('avgLatencyDisplay').innerText = `${avg} ms`;
+            }
+
+            currentIndex++;
+            updateProgressBar();
+
+            // Run next test
+            setTimeout(runNextTest, 300);
+        })
+        .catch(err => {
+            console.error('Execution error:', err);
+            currentIndex++;
+            updateProgressBar();
+            setTimeout(runNextTest, 300);
+        });
+    }
+
+    function updateProgressBar() {
+        const total = testCasesQueue.length;
+        const pct = Math.round((currentIndex / total) * 100);
+        document.getElementById('progressBar').style.width = `${pct}%`;
+        document.getElementById('progressPercent').innerText = `${pct}%`;
+        document.getElementById('streamCounter').innerText = `${currentIndex} of ${total} completed`;
+    }
+
+    function renderResultCard(res) {
+        const container = document.getElementById('liveStreamContainer');
+        const scoreColor = res.score >= 80 ? 'success' : (res.score >= 50 ? 'warning' : 'danger');
+
+        const card = document.createElement('div');
+        card.className = 'card mb-3 border shadow-sm';
+        card.innerHTML = `
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3">
+                <div>
+                    <span class="badge bg-secondary text-uppercase" style="font-size: 10px;">${res.capability}</span>
+                    <strong class="small ms-2">${res.subcategory || 'Evaluation'}</strong>
+                    <span class="badge bg-light text-muted border ms-1" style="font-size: 10px;">${res.difficulty}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small"><i class="bi bi-stopwatch me-1"></i>${res.response_time_ms} ms</span>
+                    <span class="badge bg-${scoreColor}" style="font-size: 12px;">${res.score}/100 (${res.status})</span>
+                </div>
+            </div>
+            <div class="card-body p-3">
+                <div class="small fw-semibold text-muted mb-1">PROMPT:</div>
+                <div class="p-2 rounded bg-light small mb-2 text-dark font-monospace" style="white-space: pre-wrap;">${res.prompt}</div>
+
+                <div class="small fw-semibold text-muted mb-1">MODEL OUTPUT:</div>
+                <div class="p-2 rounded bg-white border small mb-2 text-dark" style="max-height: 120px; overflow-y: auto; white-space: pre-wrap;">${res.model_response}</div>
+
+                ${res.recommendation ? `
+                    <div class="alert alert-light border p-2 mb-0 small text-secondary">
+                        <strong class="text-dark"><i class="bi bi-lightbulb me-1"></i>Diagnosis:</strong> ${res.evidence || res.status} &nbsp;|&nbsp;
+                        <strong>Action:</strong> ${res.recommendation}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        container.prepend(card);
+    }
+
+    function finalizeSession() {
+        document.getElementById('runnerStatusBadge').className = 'badge bg-success';
+        document.getElementById('runnerStatusBadge').innerText = 'COMPLETED';
+        document.getElementById('progressBar').className = 'progress-bar bg-success';
+
+        fetch(`/api/session/${sessionId}/finalize`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                const viewBtn = document.getElementById('viewResultsBtn');
+                viewBtn.href = `/investigation?session_id=${sessionId}`;
+                viewBtn.style.display = 'block';
+
+                document.getElementById('pauseResumeBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'none';
+            });
+    }
+</script>
+{% endblock %}
