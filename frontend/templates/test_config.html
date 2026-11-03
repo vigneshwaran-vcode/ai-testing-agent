@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Test Configuration — AI Investigator{% endblock %}
+{% block page_title %}Test Suite Configuration & Generation{% endblock %}
+
+{% block content %}
+{% if not active_model %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>Please <a href="{{ url_for('select_model') }}" class="alert-link">select an AI model</a> first.
+</div>
+{% else %}
+
+<div class="row g-4 mb-4">
+    <!-- Configuration Controls -->
+    <div class="col-lg-4">
+        <div class="card-custom mb-4">
+            <div class="card-header-custom">
+                <h6 class="card-title-custom">
+                    <i class="bi bi-sliders text-primary"></i>
+                    Generator Settings
+                </h6>
+            </div>
+            <div class="card-body-custom">
+                <!-- Session Name -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Test Session Name</label>
+                    <input type="text" class="form-control form-control-sm" id="sessionNameInput" value="Test Run — {{ active_model.provider|title }}: {{ active_model.model_id }}">
+                </div>
+
+                <!-- Select Capabilities -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label small fw-semibold mb-0">Target Capabilities</label>
+                        <div>
+                            <button type="button" class="btn btn-link p-0 small text-decoration-none" onclick="toggleAllCapabilities(true)" style="font-size: 11px;">Select All</button>
+                            <span class="text-muted small">|</span>
+                            <button type="button" class="btn btn-link p-0 small text-decoration-none" onclick="toggleAllCapabilities(false)" style="font-size: 11px;">Clear</button>
+                        </div>
+                    </div>
+                    <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                        {% for c in capabilities %}
+                        <div class="form-check small mb-1">
+                            <input class="form-check-input cap-checkbox" type="checkbox" value="{{ c.id }}" id="cap-{{ c.id }}" checked>
+                            <label class="form-check-label d-flex align-items-center gap-1" for="cap-{{ c.id }}">
+                                <i class="bi {{ c.icon }} text-{{ c.color }}"></i>
+                                <span>{{ c.name }}</span>
+                            </label>
+                        </div>
+                        {% else %}
+                        <div class="text-muted small">No capabilities detected. Defaulting to Chat.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Test Cases Per Domain -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold d-flex justify-content-between">
+                        <span>Cases Per Capability</span>
+                        <span id="caseCountDisplay" class="badge bg-primary">2</span>
+                    </label>
+                    <input type="range" class="form-range" id="caseCountSlider" min="1" max="5" value="2" oninput="document.getElementById('caseCountDisplay').innerText = this.value">
+                </div>
+
+                <!-- Difficulty Filter -->
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Difficulty Level</label>
+                    <select class="form-select form-select-sm" id="difficultySelect">
+                        <option value="all" selected>All Difficulties (Normal + Hard + Edge-Case)</option>
+                        <option value="normal">Normal Only (Baseline Competence)</option>
+                        <option value="hard">Hard Only (Complex Constraints)</option>
+                        <option value="edge_case">Edge Cases & Traps Only</option>
+                    </select>
+                </div>
+
+                <!-- Generate Button -->
+                <button type="button" class="btn btn-primary-custom w-100" onclick="generateTestCases()">
+                    <i class="bi bi-magic me-1"></i>Generate Test Cases
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Cases Review & Editor -->
+    <div class="col-lg-8">
+        <div class="card-custom">
+            <div class="card-header-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <h6 class="card-title-custom">
+                        <i class="bi bi-list-check text-primary"></i>
+                        Review & Customize Test Cases
+                    </h6>
+                    <span id="testCaseBadge" class="badge bg-light text-dark border">0 test cases</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addNewCustomTestCase()">
+                        <i class="bi bi-plus-lg me-1"></i>Add Custom Prompt
+                    </button>
+                    <button type="button" id="startTestBtn" class="btn btn-success btn-sm px-3" onclick="startExecutionSession()" disabled>
+                        <i class="bi bi-play-fill me-1"></i>Launch Execution &rarr;
+                    </button>
+                </div>
+            </div>
+            <div class="card-body-custom">
+                <div id="testCasesContainer">
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-journal-code fs-1 opacity-50 mb-2 d-block"></i>
+                        <p class="mb-2">No test cases generated yet.</p>
+                        <button class="btn btn-sm btn-outline-primary" onclick="generateTestCases()">Generate Initial Suite</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Editing/Adding Test Case -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold" id="modalTitle">Edit Test Case</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editIndex">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Capability</label>
+                        <select class="form-select form-select-sm" id="editCapability">
+                            <option value="chat">Chatbot & Conversation</option>
+                            <option value="coding">Coding & Programming</option>
+                            <option value="reasoning">Reasoning & Logic</option>
+                            <option value="document">Document & Text</option>
+                            <option value="safety">Safety & Bias</option>
+                            <option value="vision">Image Understanding</option>
+                            <option value="image_generation">Image Generation</option>
+                            <option value="audio">Speech & Audio</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold">Subcategory</label>
+                        <input type="text" class="form-control form-control-sm" id="editSubcategory" placeholder="e.g. Strict Instruction Following">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold">Difficulty</label>
+                        <select class="form-select form-select-sm" id="editDifficulty">
+                            <option value="normal">Normal</option>
+                            <option value="hard">Hard</option>
+                            <option value="edge_case">Edge Case</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Test Prompt to Send to Model</label>
+                    <textarea class="form-control" id="editPrompt" rows="4"></textarea>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Evaluation Rubric / Expected Criteria (JSON)</label>
+                    <textarea class="form-control code-box" id="editCriteria" rows="3">{"rubric": "Evaluates accuracy and instruction adherence."}</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary-custom btn-sm" onclick="saveTestCaseModal()">Save Test Case</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let activeTestCases = [];
+
+    function toggleAllCapabilities(checked) {
+        document.querySelectorAll('.cap-checkbox').forEach(cb => cb.checked = checked);
+    }
+
+    function generateTestCases() {
+        const selectedCaps = Array.from(document.querySelectorAll('.cap-checkbox:checked')).map(cb => cb.value);
+        if (selectedCaps.length === 0) {
+            alert('Please select at least one capability.');
+            return;
+        }
+
+        const count = parseInt(document.getElementById('caseCountSlider').value);
+        const difficulty = document.getElementById('difficultySelect').value;
+
+        fetch('/api/test-cases/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                capabilities: selectedCaps,
+                count_per_cap: count,
+                difficulty: difficulty
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                activeTestCases = data.cases;
+                renderTestCasesList();
+            }
+        });
+    }
+
+    function renderTestCasesList() {
+        const container = document.getElementById('testCasesContainer');
+        const badge = document.getElementById('testCaseBadge');
+        const startBtn = document.getElementById('startTestBtn');
+
+        badge.innerText = `${activeTestCases.length} test cases`;
+
+        if (activeTestCases.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <p>No test cases in suite.</p>
+                </div>
+            `;
+            startBtn.disabled = true;
+            return;
+        }
+
+        startBtn.disabled = false;
+        let html = '';
+
+        activeTestCases.forEach((tc, idx) => {
+            const diffColor = tc.difficulty === 'hard' ? 'danger' : (tc.difficulty === 'edge_case' ? 'warning' : 'primary');
+            html += `
+                <div class="card mb-2 border">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="badge bg-secondary text-uppercase" style="font-size: 10px;">${tc.capability}</span>
+                                <span class="badge bg-${diffColor}-subtle text-${diffColor} border ms-1" style="font-size: 10px;">${tc.difficulty}</span>
+                                <strong class="small ms-2">${tc.subcategory || 'General Test'}</strong>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="openEditModal(${idx})" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteTestCase(${idx})" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="small text-dark font-monospace bg-light p-2 rounded mb-0" style="white-space: pre-wrap; max-height: 85px; overflow-y: auto;">${tc.prompt}</div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function deleteTestCase(idx) {
+        activeTestCases.splice(idx, 1);
+        renderTestCasesList();
+    }
+
+    function openEditModal(idx) {
+        document.getElementById('editIndex').value = idx;
+        const tc = activeTestCases[idx];
+        document.getElementById('modalTitle').innerText = 'Edit Test Case #' + (idx + 1);
+        document.getElementById('editCapability').value = tc.capability;
+        document.getElementById('editSubcategory').value = tc.subcategory || '';
+        document.getElementById('editDifficulty').value = tc.difficulty || 'normal';
+        document.getElementById('editPrompt').value = tc.prompt;
+        document.getElementById('editCriteria').value = tc.evaluation_criteria || '{}';
+
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    }
+
+    function addNewCustomTestCase() {
+        document.getElementById('editIndex').value = -1;
+        document.getElementById('modalTitle').innerText = 'Add Custom Test Case';
+        document.getElementById('editPrompt').value = '';
+        document.getElementById('editSubcategory').value = 'Custom Probe';
+        document.getElementById('editCriteria').value = '{"rubric": "Custom evaluation"}';
+
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+    }
+
+    function saveTestCaseModal() {
+        const idx = parseInt(document.getElementById('editIndex').value);
+        const newCase = {
+            capability: document.getElementById('editCapability').value,
+            subcategory: document.getElementById('editSubcategory').value,
+            difficulty: document.getElementById('editDifficulty').value,
+            prompt: document.getElementById('editPrompt').value.trim(),
+            evaluation_criteria: document.getElementById('editCriteria').value.trim(),
+            expected_output: document.getElementById('editCriteria').value.trim()
+        };
+
+        if (!newCase.prompt) {
+            alert('Prompt cannot be empty.');
+            return;
+        }
+
+        if (idx === -1) {
+            activeTestCases.push(newCase);
+        } else {
+            activeTestCases[idx] = newCase;
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+        renderTestCasesList();
+    }
+
+    function startExecutionSession() {
+        if (activeTestCases.length === 0) return;
+
+        const sessionName = document.getElementById('sessionNameInput').value;
+
+        fetch('/api/session/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_name: sessionName,
+                test_cases: activeTestCases
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Store test cases in sessionStorage to run sequentially on the runner page
+                sessionStorage.setItem('pending_test_cases', JSON.stringify(data.test_cases));
+                window.location.href = `/run-tests?session_id=${data.session_id}`;
+            } else {
+                alert('Failed to start session: ' + data.message);
+            }
+        });
+    }
+
+    // Auto generate initial test suite on load
+    window.addEventListener('DOMContentLoaded', () => {
+        generateTestCases();
+    });
+</script>
+{% endblock %}
