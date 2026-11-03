@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Test History — AI Investigator{% endblock %}
+{% block page_title %}Model Test Session History{% endblock %}
+
+{% block content %}
+<div class="card-custom">
+    <div class="card-header-custom">
+        <h6 class="card-title-custom">
+            <i class="bi bi-clock-history text-primary"></i>
+            Historical Test Runs & Audits
+        </h6>
+        <span class="badge bg-light text-dark border">{{ sessions|length }} sessions stored</span>
+    </div>
+    <div class="card-body-custom p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">ID</th>
+                        <th>Session Name</th>
+                        <th>Model ID</th>
+                        <th>Provider</th>
+                        <th>Tests (Pass / Total)</th>
+                        <th>Overall Score</th>
+                        <th>Reliability</th>
+                        <th>Avg Latency</th>
+                        <th>Date Started</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td class="ps-4 text-muted">#{{ s.id }}</td>
+                        <td class="fw-bold">
+                            <a href="{{ url_for('investigation', session_id=s.id) }}" class="text-dark text-decoration-none">
+                                {{ s.session_name }}
+                            </a>
+                        </td>
+                        <td><code>{{ s.model_id }}</code></td>
+                        <td><span class="badge bg-primary text-uppercase">{{ s.provider }}</span></td>
+                        <td>
+                            <span class="text-success fw-bold">{{ s.passed_tests }}</span> / {{ s.total_tests }}
+                        </td>
+                        <td>
+                            <strong class="{% if s.overall_score >= 80 %}text-success{% elif s.overall_score >= 50 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ s.overall_score }}/100
+                            </strong>
+                        </td>
+                        <td>
+                            {% if s.reliability_level == 'HIGH' %}
+                                <span class="badge-rel-high">HIGH</span>
+                            {% elif s.reliability_level == 'MEDIUM' %}
+                                <span class="badge-rel-med">MEDIUM</span>
+                            {% else %}
+                                <span class="badge-rel-low">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ s.avg_response_time }} ms</td>
+                        <td class="text-muted small">{{ s.started_at }}</td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('investigation', session_id=s.id) }}" class="btn btn-outline-primary" title="View Failures">
+                                    <i class="bi bi-search"></i>
+                                </a>
+                                <a href="{{ url_for('analysis', session_id=s.id) }}" class="btn btn-outline-info" title="View Charts">
+                                    <i class="bi bi-bar-chart"></i>
+                                </a>
+                                <a href="{{ url_for('reports', session_id=s.id) }}" class="btn btn-outline-secondary" title="Export PDF / CSV">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            <i class="bi bi-clock-history fs-2 text-muted mb-2 d-block"></i>
+                            <p class="mb-2">No test sessions recorded yet.</p>
+                            <a href="{{ url_for('select_model') }}" class="btn btn-primary-custom btn-sm">Select AI Model & Start First Session</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
