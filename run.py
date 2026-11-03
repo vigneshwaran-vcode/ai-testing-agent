@@ -15,4 +15,4 @@ if __name__ == '__main__':
     print(f"  AI Model Testing, Evaluation and Investigation Agent")
     print(f"  Access web application at: http://127.0.0.1:{port}")
     print(f"================================================================")
-    app.run(host='127.0.0.1', port=port, debug=False)
+   app.run(host='0.0.0.0', port=port, debug=False)
