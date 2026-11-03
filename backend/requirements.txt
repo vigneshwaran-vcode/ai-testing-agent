@@ -1,0 +1,13 @@
+flask==3.0.3
+flask-cors==4.0.1
+python-dotenv==1.0.1
+openai==1.51.0
+google-generativeai==0.8.3
+anthropic==0.37.1
+requests==2.32.3
+reportlab==4.2.5
+fpdf2==2.8.1
+sqlite3-api==0.0.1
+Pillow==10.4.0
+tiktoken==0.8.0
+sseclient-py==1.8.0
